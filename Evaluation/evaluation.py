@@ -97,7 +97,6 @@ def semantic_similarity_eval(open_ended_dataset, model_name):
     num_rows = open_ended_dataset['train'].num_rows
     return correct_count / num_rows, results
 
-
 def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
     # Fetch dataset files using helper function
     dataset_files = get_dataset_files(dataset_type, args)
@@ -108,6 +107,9 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
 
         # Load dataset data using helper function
         dataset = load_dataset_data(dataset_type, data_file)
+
+        # Check if the CSV file exists to determine if headers need to be written
+        file_exists = os.path.isfile(file_name)
 
         # Now perform evaluations
         for model_name in models:
@@ -125,8 +127,10 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
 
             print(f"Accuracy for {model_name}: {accuracy * 100:.2f}%")
 
-            # Write results to CSV using helper function
-            write_results_to_csv(results, headers, model_name, data_file, file_name)
+            # Write results to CSV immediately
+            write_results_to_csv(results, headers, model_name, data_file, file_name, file_exists)
+            # Update file_exists to True for subsequent writes
+            file_exists = True
 
 
 def get_dataset_files(dataset_type, args):
@@ -150,9 +154,8 @@ def load_dataset_data(dataset_type, data_file):
     print(dataset)
     return dataset
 
-def write_results_to_csv(results, headers, model_name, data_file, file_name):
+def write_results_to_csv(results, headers, model_name, data_file, file_name, file_exists):
     """Write the evaluation results to a CSV file."""
-    file_exists = os.path.isfile(file_name)
     with open(file_name, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
 

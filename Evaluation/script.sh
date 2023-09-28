@@ -9,7 +9,8 @@ nvidia-smi
 export HF_HOME=/pscratch/sd/s/sharma21/hf/
 cd $SCRATCH
 source lm4hpcenv/bin/activate
+echo "OPENAI_API_KEY='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'" >> ~/.bashrc
 module load pytorch/2.0.1
 
 huggingface-cli whoami
-python LM4HPC/Evaluation/evaluation.py --mcqa_dataset_file "mcq-single-orig.csv" --open_ended_dataset_file "text.csv" --model_names HuggingFaceH4/starchat-alpha gpt-4 gpt-3.5-turbo --output_csv "semantic_similarity_results_all.csv"
+python LM4HPC/Evaluation/evaluation.py
