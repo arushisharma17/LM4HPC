@@ -9,7 +9,7 @@ from lm4hpc.hpcpipeline import hpcpipelines
 import evaluate
 
 # Constants
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
 HUGGINGFACEHUB_API_TOKEN = "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"
 
 # Environment Variables
@@ -19,7 +19,7 @@ os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACEHUB_API_TOKEN
 # Set up external services
 import openai
 openai.api_key = os.environ["OPENAI_API_KEY"]
-print(openai.api_key)
+
 def bleu_score_eval():
     # Load metrics
     bleu = evaluate.load("bleu")
