@@ -12,7 +12,6 @@ import sys
 # Set up external services
 import openai
 openai.api_key = os.environ["OPENAI_API_KEY"]
-print(openai.api_key)
 
 def bleu_score_eval():
     # Load metrics
@@ -21,11 +20,14 @@ def bleu_score_eval():
     perplexity = evaluate.load("perplexity", module_type="metric")
     # results = perplexity.compute(predictions=predictions, model_id='gpt2')
     
-def exact_match_evaluation(mcqa_dataset,model_name):
-    '''Adapted from DoctorGPT exact match method for MCQ evaluation--removed conversation history'''
+
+def exact_match_evaluation(mcqa_dataset, model_name):
+    '''Evaluate model based on exact match for MCQs'''
 
     correct = 0
     total = 0
+
+    # Initialize model pipeline
     OMP_QA_sc = hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files="", langchain_embedding="")
 
     results = []
@@ -34,63 +36,54 @@ def exact_match_evaluation(mcqa_dataset,model_name):
         question = example['startphrase (context + question)']
 
         try:
-            options = "A." + example['ending0'] + "B." + example['ending1'] + "C." + example['ending2'] + "D." + example['ending3']
-            input_sample = question + options + "Please output the correct option A,B,C or D only"
+            options = f"A.{example['ending0']} B.{example['ending1']} C.{example['ending2']} D.{example['ending3']}"
+            input_sample = f"{question} {options} Please output the correct option A,B,C or D only"
             response = OMP_QA_sc(input_sample)
-            generated_text = response
-            correct_answer = example['Answer']
-            predicted_answer_idx = generated_text[0]
 
-            is_correct = (correct_answer == predicted_answer_idx)
+            correct_answer = example['Answer']
+            is_correct = (correct_answer == response[0])
+
             if is_correct:
                 correct += 1
 
-            results.append((model_name, question, generated_text, correct_answer, is_correct))
+            results.append((model_name, question, response, correct_answer, is_correct))
             total += 1
 
-        except TypeError:
-            print(f"Found TypeError (probably due to None value) in line {idx + 1}. Endings: {example['ending0'], example['ending1'], example['ending2'], example['ending3']}")
+        except Exception as e:
+            print(f"Error at line {idx + 1}. Endings: {example['ending0'], example['ending1'], example['ending2'], example['ending3']}. Error: {str(e)}")
 
     return correct / total, results
 
-def semantic_similarity_eval(open_ended_dataset,model_name):
-    '''Adapted from DoctorGPT exact match method for MCQ evaluation--removed conversation history'''
-    print("entered semantic similarity function")
+
+def semantic_similarity_eval(open_ended_dataset, model_name):
+    '''Evaluate model based on semantic similarity'''
+
     correct_count = 0
 
     # Initialize sentence transformer model
-    #free embeddings!
     embedder = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-    print("embedder")
-    OMP_QA_sc=hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files = "", langchain_embedding ="")
-    predictions=[]
-    references=[]
-    results = []  # This list will store the results for each question
+    
+    # Initialize model pipeline
+    OMP_QA_sc = hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files="", langchain_embedding="")
+
+    results = []
 
     for example in open_ended_dataset['train']:
-        input_sample = example['startphrase (Context + Question)']  # Replace 'text_field' with the actual field name
-        print("input_sample", input_sample)
+        input_sample = example['startphrase (Context + Question)']
         response = OMP_QA_sc(input_sample)
-        print("response",response)
         answer = example['Answer']
 
         # Generate embeddings for the response and correct answer
         response_embedding = embedder.encode(response, convert_to_tensor=True)
-        #print("response embedding", response_embedding)
         correct_answer_embedding = embedder.encode(answer, convert_to_tensor=True)
-
-        #print("answer embedding",correct_answer_embedding)
 
         # Compute cosine similarity
         cosine_similarity = util.pytorch_cos_sim(response_embedding, correct_answer_embedding).item()
-        print('the similarity is ' + str(cosine_similarity))
-        is_correct = cosine_similarity >= 0.3 # Adjust the threshold as needed, >30% threshold
+
+        is_correct = cosine_similarity >= 0.3  # Adjust the threshold as needed
 
         if is_correct:
             correct_count += 1
-
-        print(f"Correct Answer: {answer}")
-        print(f"Is Model's Response Correct? {is_correct}\n")
 
         results.append({
             "question": input_sample,
@@ -99,91 +92,11 @@ def semantic_similarity_eval(open_ended_dataset,model_name):
             "similarity": cosine_similarity,
             "is_correct": is_correct
         })
-    
-    # Print the accuracy
-    num_rows = open_ended_dataset['train'].num_rows
-    print("num_rows", num_rows)
-    accuracy = correct_count / num_rows * 100
-    print(f"Accuracy on the first {num_rows} rows: {accuracy}%")
 
-    # Return both accuracy and the list of results
+    # Using num_rows for the dataset length
+    num_rows = open_ended_dataset['train'].num_rows
     return correct_count / num_rows, results
 
-
-
-def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
-    # Determine dataset files based on dataset_type
-    if dataset_type == "open_ended":
-        dataset_files = args.open_ended_dataset_file
-    elif dataset_type == "mcqa":
-        dataset_files = args.mcqa_dataset_file
-    else:
-        raise ValueError(f"Invalid dataset_type: {dataset_type}")
-
-    # Loop through dataset files
-    for data_file in dataset_files:
-        print(f"Loading data from: {data_file}")
-        
-        # Load the dataset
-        if dataset_type == "open_ended":
-            dataset = load_dataset("sharmaarushi17/HPCPerfOpt-Open-ended", data_files=data_file)
-            num_rows = dataset['train'].num_rows
-            print("num_rows", num_rows)
-            print(dataset)
-        elif dataset_type == "mcqa":
-            dataset = load_dataset("sharmaarushi17/HPCPerfOpt-MCQA", data_files=data_file)
-            print(dataset)
-
-        # Now perform evaluations
-        for model_name in models:
-            print(f"Evaluating model: {model_name}")
-
-            # Determine which evaluation method to use
-            if evaluation_type == "semantic_similarity":
-                accuracy, results = semantic_similarity_eval(dataset, model_name)
-                headers = ["Model Name", "Dataset", "Question", "Response", "Correct Answer", "Cosine Similarity", "Is Correct"]
-            elif evaluation_type == "exact_match":
-                accuracy, results = exact_match_evaluation(dataset, model_name)
-                headers = ['Model Name', 'Dataset', 'Question', 'Response', 'Correct Answer', 'Is Correct']
-            else:
-                raise ValueError(f"Invalid evaluation_type: {evaluation_type}")
-
-            print(f"Accuracy for {model_name}: {accuracy * 100:.2f}%")
-
-            # Write results to CSV
-            file_exists = os.path.isfile(file_name)
-            with open(file_name, 'a', newline='') as csvfile:
-                csvwriter = csv.writer(csvfile)
-                
-                # Write headers only if the file is new
-                if not file_exists:
-                    csvwriter.writerow(headers)
-
-                if evaluation_type == "semantic_similarity":
-                    for result in results:
-                        csvwriter.writerow([model_name, data_file, result["question"], result["response"], result["correct_answer"], result["similarity"], result["is_correct"]])
-                else:
-                    for result in results:
-                        csvwriter.writerow([model_name, data_file, result["question"], result["response"], result["correct_answer"], result["is_correct"]])
-
-# Assuming you've parsed args using argparse before calling this function.
-# Example Usage:
-# evaluate_models(["gpt-4", "gpt-3.5-turbo"], "semantic_similarity", "semantic_similarity_results.csv", "open_ended", args)
-# evaluate_models(["gpt-4", "gpt-3.5-turbo"], "exact_match", "evaluation_results_rodinia.csv", "mcqa", args)
-
-import os
-from datasets import load_dataset
-from sentence_transformers import SentenceTransformer, util
-import argparse
-import csv
-
-# Local imports
-from lm4hpc.hpcpipeline import hpcpipelines
-import sys
-
-# Set up external services
-import openai
-openai.api_key = os.environ["OPENAI_API_KEY"]
 
 def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
     # Fetch dataset files using helper function
