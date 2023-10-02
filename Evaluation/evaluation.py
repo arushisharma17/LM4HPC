@@ -136,8 +136,10 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
 def get_dataset_files(dataset_type, args):
     """Determine the dataset files based on the dataset type."""
     if dataset_type == "open_ended":
+        print("Loading configuration", args.open_ended_dataset_file)
         return args.open_ended_dataset_file
     elif dataset_type == "mcqa":
+        print("Loading configuration", args.mcqa_dataset_file)
         return args.mcqa_dataset_file
     else:
         raise ValueError(f"Invalid dataset_type: {dataset_type}")

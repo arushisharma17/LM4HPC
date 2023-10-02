@@ -1,0 +1,86 @@
+Wed Sep 27 20:16:58 2023       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 525.105.17   Driver Version: 525.105.17   CUDA Version: 12.0     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA A100-SXM...  On   | 00000000:03:00.0 Off |                    0 |
+| N/A   27C    P0    59W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   1  NVIDIA A100-SXM...  On   | 00000000:41:00.0 Off |                    0 |
+| N/A   25C    P0    58W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   2  NVIDIA A100-SXM...  On   | 00000000:82:00.0 Off |                    0 |
+| N/A   26C    P0    59W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   3  NVIDIA A100-SXM...  On   | 00000000:C1:00.0 Off |                    0 |
+| N/A   25C    P0    58W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+Warning: This is an experimental release of NCCL with an OFI plugin for use with libfabric on Perlmutter.
+In case of issues, please refer to our known issues: https://docs.nersc.gov/current/
+and open a help ticket if your issue is not listed: https://help.nersc.gov/
+sharmaarushi17
+
+===================================BUG REPORT===================================
+Welcome to bitsandbytes. For bug reports, please run
+
+python -m bitsandbytes
+
+ and submit this information together with your error trace to: https://github.com/TimDettmers/bitsandbytes/issues
+================================================================================
+CUDA SETUP: CUDA runtime path found: /opt/nvidia/hpc_sdk/Linux_x86_64/22.7/cuda/11.7/lib64/libcudart.so
+CUDA SETUP: Highest compute capability among GPUs detected: 8.0
+CUDA SETUP: Detected CUDA version 117
+CUDA SETUP: Loading binary /global/homes/s/sharma21/.local/perlmutter/pytorch2.0.1/lib/python3.9/site-packages/bitsandbytes/libbitsandbytes_cuda117.so...
+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
+Downloading readme:   0%|          | 0.00/1.96k [00:00<?, ?B/s]Downloading readme: 100%|██████████| 1.96k/1.96k [00:00<00:00, 4.76MB/s]
+Downloading and preparing dataset csv/sharmaarushi17--HPCPerfOpt-MCQA to /pscratch/sd/s/sharma21/hf/datasets/sharmaarushi17___csv/sharmaarushi17--HPCPerfOpt-MCQA-17da64045b41ee2a/0.0.0/eea64c71ca8b46dd3f537ed218fc9bf495d5707789152eb2764f5c78fa66d59d...
+Downloading data files:   0%|          | 0/1 [00:00<?, ?it/s]
+Downloading data:   0%|          | 0.00/978k [00:00<?, ?B/s][A
+Downloading data:   9%|▊         | 84.0k/978k [00:00<00:01, 742kB/s][A
+Downloading data:  34%|███▎      | 329k/978k [00:00<00:00, 1.69MB/s][ADownloading data: 100%|██████████| 978k/978k [00:00<00:00, 3.22MB/s]
+Downloading data files: 100%|██████████| 1/1 [00:00<00:00,  1.26it/s]Downloading data files: 100%|██████████| 1/1 [00:00<00:00,  1.26it/s]
+Extracting data files:   0%|          | 0/1 [00:00<?, ?it/s]Extracting data files: 100%|██████████| 1/1 [00:00<00:00, 913.00it/s]
+Generating train split: 0 examples [00:00, ? examples/s]                                                        Dataset csv downloaded and prepared to /pscratch/sd/s/sharma21/hf/datasets/sharmaarushi17___csv/sharmaarushi17--HPCPerfOpt-MCQA-17da64045b41ee2a/0.0.0/eea64c71ca8b46dd3f537ed218fc9bf495d5707789152eb2764f5c78fa66d59d. Subsequent calls will reuse this data.
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 579.40it/s]
+DatasetDict({
+    train: Dataset({
+        features: ['Index', 'Topic /Type of Performance Issue', 'Context', 'Text (optional)', 'Code (optional)', 'Machine Information (optional)', 'Profiling Information(optional)', 'Question Type', 'Question', 'startphrase (context + question)', 'ending0', 'ending1', 'ending2', 'ending3', 'Answer', 'Source'],
+        num_rows: 139
+    })
+})
+Downloading readme:   0%|          | 0.00/1.98k [00:00<?, ?B/s]Downloading readme: 100%|██████████| 1.98k/1.98k [00:00<00:00, 4.95MB/s]
+Downloading and preparing dataset csv/sharmaarushi17--HPCPerfOpt-Open-ended to /pscratch/sd/s/sharma21/hf/datasets/sharmaarushi17___csv/sharmaarushi17--HPCPerfOpt-Open-ended-574387626638719d/0.0.0/eea64c71ca8b46dd3f537ed218fc9bf495d5707789152eb2764f5c78fa66d59d...
+Downloading data files:   0%|          | 0/1 [00:00<?, ?it/s]
+Downloading data:   0%|          | 0.00/22.4k [00:00<?, ?B/s][ADownloading data: 100%|██████████| 22.4k/22.4k [00:00<00:00, 4.76MB/s]
+Downloading data files: 100%|██████████| 1/1 [00:00<00:00,  2.01it/s]Downloading data files: 100%|██████████| 1/1 [00:00<00:00,  2.01it/s]
+Extracting data files:   0%|          | 0/1 [00:00<?, ?it/s]Extracting data files: 100%|██████████| 1/1 [00:00<00:00, 1435.42it/s]
+Generating train split: 0 examples [00:00, ? examples/s]                                                        Dataset csv downloaded and prepared to /pscratch/sd/s/sharma21/hf/datasets/sharmaarushi17___csv/sharmaarushi17--HPCPerfOpt-Open-ended-574387626638719d/0.0.0/eea64c71ca8b46dd3f537ed218fc9bf495d5707789152eb2764f5c78fa66d59d. Subsequent calls will reuse this data.
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 780.34it/s]
+num_rows 29
+DatasetDict({
+    train: Dataset({
+        features: ['Index', 'Topic /Type of Performance Issue', 'Context', 'Text (optional)', 'Code (optional)', 'Machine Information (optional)', 'Profiling Information(optional)', 'Question Type', 'Question', 'startphrase (Context + Question)', 'Answer', 'Source'],
+        num_rows: 29
+    })
+})
+Traceback (most recent call last):
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 197, in <module>
+    run_semantic_similarity(open_ended_dataset, args.model_names, num_rows)
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 169, in run_semantic_similarity
+    for model_name in args.models:
+AttributeError: 'Namespace' object has no attribute 'models'
