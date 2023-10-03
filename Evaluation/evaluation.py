@@ -13,6 +13,21 @@ import sys
 import openai
 openai.api_key = os.environ["OPENAI_API_KEY"]
 
+
+# Separate instruction maps for both evaluations
+SEMANTIC_SIMILARITY_INSTRUCTIONS = {
+    "text": "You are an openmp performance optimization expert. Provide useful, complete, and logically correct answers to performance optimization questions based on the given code samples.",
+    "code": "You are an openmp performance optimization expert. Provide complete, syntactically and semantically correct answers to performance optimization questions based on the given code samples."
+}
+
+EXACT_MATCH_INSTRUCTIONS = {
+    "standard": "The following is a multiple choice question about openmp performance optimization. Output a single option from the four options as the final answer.",
+    "cot": "The following is a multiple choice question about openmp performance optimization. Solve it in a step-by-step fashion, starting by summarizing the available information. Output a single option from the four options as the final answer."
+
+}
+
+
+
 def bleu_score_eval():
     # Load metrics
     bleu = evaluate.load("bleu")
@@ -20,16 +35,13 @@ def bleu_score_eval():
     perplexity = evaluate.load("perplexity", module_type="metric")
     # results = perplexity.compute(predictions=predictions, model_id='gpt2')
     
-
-def exact_match_evaluation(mcqa_dataset, model_name):
+def exact_match_evaluation(mcqa_dataset, model_name, instructions_list):
     '''Evaluate model based on exact match for MCQs'''
     correct = 0
     total = 0
     OMP_QA_sc = hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files="", langchain_embedding="")
     results = []
-    instructions_std = "The following is a multiple choice question about openmp performance optimization. Output a single option from the four options as the final answer."
-    instructions_cot = "The following is a multiple choice question about openmp performance optimization. Solve it in a step-by-step fashion, starting by summarizing the available information. Output a single option from the four options as the final answer."
-    instructions_list = [instructions_std, instructions_cot]
+    
     for instruction in instructions_list:
         for idx, example in enumerate(mcqa_dataset['train']):
             question = example['startphrase( context + question)']
@@ -54,46 +66,54 @@ def exact_match_evaluation(mcqa_dataset, model_name):
                 print(f"Error at line {idx + 1}. Error: {str(e)}")
     return correct / total, results
 
-def semantic_similarity_eval(open_ended_dataset, model_name):
-    '''Evaluate model based on semantic similarity'''
 
-    correct_count = 0
+
+def semantic_similarity_eval(open_ended_dataset, model_name, instructions_list=None):
+    '''Evaluate model based on semantic similarity'''
 
     # Initialize sentence transformer model
     embedder = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-    
+
     # Initialize model pipeline
     OMP_QA_sc = hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files="", langchain_embedding="")
 
     results = []
 
-    for example in open_ended_dataset['train']:
-        input_sample = example['startphrase (Context + Question)']
-        response = OMP_QA_sc(input_sample)
-        answer = example['Answer']
+    # If no instructions are provided, default to an empty instruction.
+    if instructions_list is None:
+        instructions_list = [""]
 
-        # Generate embeddings for the response and correct answer
-        response_embedding = embedder.encode(response, convert_to_tensor=True)
-        correct_answer_embedding = embedder.encode(answer, convert_to_tensor=True)
+    correct_count = 0
 
-        # Compute cosine similarity
-        cosine_similarity = util.pytorch_cos_sim(response_embedding, correct_answer_embedding).item()
+    for instruction in instructions_list:
+        for example in open_ended_dataset['train']:
+            input_sample = f"{instruction} {example['startphrase (Context + Question)']}"
+            response = OMP_QA_sc(input_sample)
+            answer = example['Answer']
 
-        is_correct = cosine_similarity >= 0.3  # Adjust the threshold as needed
+            # Generate embeddings for the response and correct answer
+            response_embedding = embedder.encode(response, convert_to_tensor=True)
+            correct_answer_embedding = embedder.encode(answer, convert_to_tensor=True)
 
-        if is_correct:
-            correct_count += 1
+            # Compute cosine similarity
+            cosine_similarity = util.pytorch_cos_sim(response_embedding, correct_answer_embedding).item()
 
-        results.append({
-            "question": input_sample,
-            "response": response,
-            "correct_answer": answer,
-            "similarity": cosine_similarity,
-            "is_correct": is_correct
-        })
+            is_correct = cosine_similarity >= 0.3  # Adjust the threshold as needed
 
-    # Using num_rows for the dataset length
-    num_rows = open_ended_dataset['train'].num_rows
+            if is_correct:
+                correct_count += 1
+
+            results.append({
+                "instruction": instruction,
+                "question": input_sample,
+                "response": response,
+                "correct_answer": answer,
+                "similarity": cosine_similarity,
+                "is_correct": is_correct
+            })
+
+    # Using num_rows multiplied by the number of instructions for the dataset length
+    num_rows = len(open_ended_dataset['train']) * len(instructions_list)
     return correct_count / num_rows, results
 
 
@@ -118,8 +138,8 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
 
             # Determine which evaluation method to use
             if evaluation_type == "semantic_similarity":
-                accuracy, results = semantic_similarity_eval(dataset, model_name)
-                headers = ["Model Name", "Dataset", "Question", "Response", "Correct Answer", "Cosine Similarity", "Is Correct"]
+                accuracy, results = semantic_similarity_eval(dataset, model_name, instructions_list)
+                headers = ["Model Name", "Dataset", "Instruction", "Question", "Response", "Correct Answer", "Cosine Similarity", "Is Correct"]
             elif evaluation_type == "exact_match":
                 accuracy, results = exact_match_evaluation(dataset, model_name)
                 headers = ['Model Name', 'Dataset','Instruction', 'Question', 'Response', 'Correct Answer', 'Is Correct']
@@ -183,7 +203,7 @@ def write_results_to_csv(results, headers, model_name, data_file, file_name, fil
             csvwriter.writerow(headers)
         for result in results:
             if "similarity" in result:
-                csvwriter.writerow([model_name, data_file, result["question"], result["response"], result["correct_answer"], result["similarity"], result["is_correct"]])
+                csvwriter.writerow([model_name, data_file,result["instruction"], result["question"], result["response"], result["correct_answer"], result["similarity"], result["is_correct"]])
             else:
                 csvwriter.writerow([model_name, data_file, result["instruction"], result["question"], result["response"], result["correct_answer"], result["is_correct"]])
 
@@ -197,16 +217,25 @@ if __name__ == "__main__":
     parser.add_argument("--mcqa_dataset_file", nargs='+', default=["mcq-single-orig.csv", "rodinia-chatgpt-mcq-orig.csv"], help="Paths to the MCQA dataset files.")
     parser.add_argument("--open_ended_dataset_file", nargs='+', default=["code.csv", "text.csv"], help="Paths to the open-ended dataset files.")
     parser.add_argument("--model_names", nargs='+', default=["HuggingFaceH4/starchat-alpha","gpt-4", "gpt-3.5-turbo"], help="List of model names to evaluate.")
-    parser.add_argument("--semantic_similarity_output_csv", default="LM4HPC/Evaluation/semantic_similarity_results.csv", help="Name of the output CSV file for semantic similarity evaluation.")
-    parser.add_argument("--exact_match_output_csv", default="LM4HPC/Evaluation/evaluation_results_rodinia.csv", help="Name of the output CSV file for exact match evaluation.")
-
+    parser.add_argument("--semantic_similarity_instruction_type", choices=['standard', 'detailed'], default="standard", help="Type of instruction to be used for semantic similarity evaluation.")
+    parser.add_argument("--exact_match_instruction_type", choices=['standard', 'detailed'], default="standard", help="Type of instruction to be used for exact match evaluation.")
+    
     # Parse the arguments
     args = parser.parse_args()
 
     # Print the OpenAI API Key for debugging (consider removing this for security reasons!)
     print(openai.api_key)
+    
+    # Extract instructions based on user input
+    semantic_similarity_instruction = SEMANTIC_SIMILARITY_INSTRUCTIONS[args.semantic_similarity_instruction_type]
+    exact_match_instruction = EXACT_MATCH_INSTRUCTIONS[args.exact_match_instruction_type]
+
+    # Dynamically create output filenames based on provided arguments
+    semantic_similarity_output_csv = f"LM4HPC/Evaluation/{args.model_names}_semantic_similarity_{args.semantic_similarity_instruction_type}.csv"
+    exact_match_output_csv = f"LM4HPC/Evaluation/{args.model_names}_exact_match_{args.exact_match_instruction_type}.csv"
+
 
     # Run evaluations
-    #evaluate_models(args.model_names, "semantic_similarity", args.semantic_similarity_output_csv, "open_ended", args)
-    evaluate_models(args.model_names, "exact_match", args.exact_match_output_csv, "mcqa", args)
+    evaluate_models(args.model_names, "semantic_similarity", semantic_similarity_output_csv, "open_ended", args, semantic_similarity_instruction)
+    evaluate_models(args.model_names, "exact_match", exact_match_output_csv, "mcqa", args, exact_match_instruction)
 
