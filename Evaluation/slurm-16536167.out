@@ -1,0 +1,68 @@
+Mon Oct  2 20:05:11 2023       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 525.105.17   Driver Version: 525.105.17   CUDA Version: 12.0     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA A100-SXM...  On   | 00000000:03:00.0 Off |                    0 |
+| N/A   27C    P0    57W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   1  NVIDIA A100-SXM...  On   | 00000000:41:00.0 Off |                    0 |
+| N/A   26C    P0    58W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   2  NVIDIA A100-SXM...  On   | 00000000:82:00.0 Off |                    0 |
+| N/A   26C    P0    57W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   3  NVIDIA A100-SXM...  On   | 00000000:C1:00.0 Off |                    0 |
+| N/A   25C    P0    59W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+Warning: This is an experimental release of NCCL with an OFI plugin for use with libfabric on Perlmutter.
+In case of issues, please refer to our known issues: https://docs.nersc.gov/current/
+and open a help ticket if your issue is not listed: https://help.nersc.gov/
+sharmaarushi17
+Found cached dataset csv (/pscratch/sd/s/sharma21/hf/datasets/sharmaarushi17___csv/sharmaarushi17--HPCPerfOpt-MCQA-4c17e24d70088d31/0.0.0/eea64c71ca8b46dd3f537ed218fc9bf495d5707789152eb2764f5c78fa66d59d)
+
+===================================BUG REPORT===================================
+Welcome to bitsandbytes. For bug reports, please run
+
+python -m bitsandbytes
+
+ and submit this information together with your error trace to: https://github.com/TimDettmers/bitsandbytes/issues
+================================================================================
+CUDA SETUP: CUDA runtime path found: /opt/nvidia/hpc_sdk/Linux_x86_64/22.7/cuda/11.7/lib64/libcudart.so
+CUDA SETUP: Highest compute capability among GPUs detected: 8.0
+CUDA SETUP: Detected CUDA version 117
+CUDA SETUP: Loading binary /global/homes/s/sharma21/.local/perlmutter/pytorch2.0.1/lib/python3.9/site-packages/bitsandbytes/libbitsandbytes_cuda117.so...
+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
+Loading configuration ['mcq-single-orig.csv', 'rodinia-chatgpt-mcq-orig.csv']
+Loading data from: mcq-single-orig.csv
+  0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 299.02it/s]
+DatasetDict({
+    train: Dataset({
+        features: ['Index', 'Topic /Type of Performance Issue', 'Context', 'Text (optional)Code(optional)', 'Code (optional)', 'Machine Information (optional)', 'Profiling Information(optional)', 'Question Type', 'Question', 'startphrase( context + question)', 'ending0', 'ending1', 'ending2', 'ending3', 'Answer', 'Source'],
+        num_rows: 85
+    })
+})
+Evaluating model: HuggingFaceH4/starchat-alpha
+Traceback (most recent call last):
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 195, in <module>
+    evaluate_models(args.model_names, "exact_match", args.exact_match_output_csv, "mcqa", args)
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 123, in evaluate_models
+    accuracy, results = exact_match_evaluation(dataset, model_name)
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 36, in exact_match_evaluation
+    question = example['startphrase (context + question)']
+KeyError: 'startphrase (context + question)'
