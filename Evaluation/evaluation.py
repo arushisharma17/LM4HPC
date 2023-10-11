@@ -23,7 +23,8 @@ SEMANTIC_SIMILARITY_INSTRUCTIONS = {
 EXACT_MATCH_INSTRUCTIONS = {
     "standard": "The following is a multiple choice question about openmp performance optimization. Output a single option from the four options as the final answer.",
     "cot": "The following is a multiple choice question about openmp performance optimization. Solve it in a step-by-step fashion, starting by summarizing the available information. Output a single option from the four options as the final answer."
-
+    "standard_instr": "The following is a multiple choice question about openmp performance optimization. Output a single option "A", "B", "C" or "D" from the four options as the final answer.",
+    "cot_instr": "The following is a multiple choice question about openmp performance optimization. Solve it in a step-by-step fashion, starting by summarizing the available information. Output a single option from the four options as the final answer. The output should be in json format with the following two fields: {"Explanation": <containing step-by-step reasoning> , "Answer":<containing correct option letter>}."
 }
 
 
@@ -216,9 +217,9 @@ if __name__ == "__main__":
     # Multiple dataset files can be input as a list separated by commas
     parser.add_argument("--mcqa_dataset_file", nargs='+', default=["mcq-single-orig.csv", "rodinia-chatgpt-mcq-orig.csv"], help="Paths to the MCQA dataset files.")
     parser.add_argument("--open_ended_dataset_file", nargs='+', default=["code.csv", "text.csv"], help="Paths to the open-ended dataset files.")
-    parser.add_argument("--model_names", nargs='+', default=["HuggingFaceH4/starchat-alpha","gpt-4", "gpt-3.5-turbo"], help="List of model names to evaluate.")
-    parser.add_argument("--semantic_similarity_instruction_type", choices=['standard', 'detailed'], default="standard", help="Type of instruction to be used for semantic similarity evaluation.")
-    parser.add_argument("--exact_match_instruction_type", choices=['standard', 'detailed'], default="standard", help="Type of instruction to be used for exact match evaluation.")
+    parser.add_argument("--model_names", nargs='+', default=["gpt-4", "gpt-3.5-turbo", "HuggingFaceH4/starchat-alpha"], help="List of model names to evaluate.")
+    parser.add_argument("--semantic_similarity_instruction_type", choices=['text', 'code'], default="standard", help="Type of instruction to be used for semantic similarity evaluation.")
+    parser.add_argument("--exact_match_instruction_type", choices=['standard', 'cot', 'standard_instr', 'cot_instr'], default="standard", help="Type of instruction to be used for exact match evaluation.")
     
     # Parse the arguments
     args = parser.parse_args()
