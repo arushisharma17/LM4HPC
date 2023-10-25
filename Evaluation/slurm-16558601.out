@@ -1,0 +1,53 @@
+Mon Oct  2 23:24:32 2023       
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 525.105.17   Driver Version: 525.105.17   CUDA Version: 12.0     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA A100-SXM...  On   | 00000000:03:00.0 Off |                    0 |
+| N/A   27C    P0    58W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   1  NVIDIA A100-SXM...  On   | 00000000:41:00.0 Off |                    0 |
+| N/A   25C    P0    59W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   2  NVIDIA A100-SXM...  On   | 00000000:82:00.0 Off |                    0 |
+| N/A   26C    P0    57W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+|   3  NVIDIA A100-SXM...  On   | 00000000:C1:00.0 Off |                    0 |
+| N/A   25C    P0    59W / 500W |      0MiB / 81920MiB |      0%      Default |
+|                               |                      |             Disabled |
++-------------------------------+----------------------+----------------------+
+                                                                               
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+Warning: This is an experimental release of NCCL with an OFI plugin for use with libfabric on Perlmutter.
+In case of issues, please refer to our known issues: https://docs.nersc.gov/current/
+and open a help ticket if your issue is not listed: https://help.nersc.gov/
+sharmaarushi17
+
+===================================BUG REPORT===================================
+Welcome to bitsandbytes. For bug reports, please run
+
+python -m bitsandbytes
+
+ and submit this information together with your error trace to: https://github.com/TimDettmers/bitsandbytes/issues
+================================================================================
+CUDA SETUP: CUDA runtime path found: /opt/nvidia/hpc_sdk/Linux_x86_64/22.7/cuda/11.7/lib64/libcudart.so.11.0
+CUDA SETUP: Highest compute capability among GPUs detected: 8.0
+CUDA SETUP: Detected CUDA version 117
+CUDA SETUP: Loading binary /global/homes/s/sharma21/.local/perlmutter/pytorch2.0.1/lib/python3.9/site-packages/bitsandbytes/libbitsandbytes_cuda117.so...
+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
+Traceback (most recent call last):
+  File "/pscratch/sd/s/sharma21/LM4HPC/Evaluation/evaluation.py", line 240, in <module>
+    evaluate_models(args.model_names, "exact_match", exact_match_output_csv, "mcqa", args, exact_match_instruction)
+TypeError: evaluate_models() takes 5 positional arguments but 6 were given

@@ -28,7 +28,6 @@ EXACT_MATCH_INSTRUCTIONS = {
 }
 
 
-
 def bleu_score_eval():
     # Load metrics
     bleu = evaluate.load("bleu")
@@ -118,7 +117,7 @@ def semantic_similarity_eval(open_ended_dataset, model_name, instructions_list=N
     return correct_count / num_rows, results
 
 
-def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
+def evaluate_models(models, evaluation_type, dataset_type, instructions_list, args):
     # Fetch dataset files using helper function
     dataset_files = get_dataset_files(dataset_type, args)
     model_accuracies = {}
@@ -128,10 +127,10 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
         print(f"Loading data from: {data_file}")
 
         # Load dataset data using helper function
-        dataset = load_dataset_data(dataset_type, data_file)
+        dataset,output_file_name = load_dataset_data(dataset_type, data_file)
 
         # Check if the CSV file exists to determine if headers need to be written
-        file_exists = os.path.isfile(file_name)
+        file_exists = os.path.isfile(output_file_name)
 
         # Now perform evaluations
         for model_name in models:
@@ -142,7 +141,7 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
                 accuracy, results = semantic_similarity_eval(dataset, model_name, instructions_list)
                 headers = ["Model Name", "Dataset", "Instruction", "Question", "Response", "Correct Answer", "Cosine Similarity", "Is Correct"]
             elif evaluation_type == "exact_match":
-                accuracy, results = exact_match_evaluation(dataset, model_name)
+                accuracy, results = exact_match_evaluation(dataset, model_name, instructions_list)
                 headers = ['Model Name', 'Dataset','Instruction', 'Question', 'Response', 'Correct Answer', 'Is Correct']
             else:
                 raise ValueError(f"Invalid evaluation_type: {evaluation_type}")
@@ -153,16 +152,16 @@ def evaluate_models(models, evaluation_type, file_name, dataset_type, args):
             model_accuracies[model_name] = accuracy
 
             # Write results to CSV immediately
-            write_results_to_csv(results, headers, model_name, data_file, file_name, file_exists)
+            write_results_to_csv(results, headers, model_name, data_file, output_file_name, file_exists)
             
             # Update file_exists to True for subsequent writes
             file_exists = True
     
     # Write the final accuracies to the CSV file at the top
-    with open(file_name, 'r') as original:
+    with open(output_file_name, 'r') as original:
         data = original.read()
     
-    with open(file_name, 'w', newline='') as csvfile:
+    with open(output_file_name, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['Model Name', 'Accuracy'])
         for model_name, accuracy in model_accuracies.items():
@@ -184,20 +183,30 @@ def get_dataset_files(dataset_type, args):
     else:
         raise ValueError(f"Invalid dataset_type: {dataset_type}")
 
-def load_dataset_data(dataset_type, data_file):
+def load_dataset_data(dataset_type, data_file, args):
     """Load dataset based on dataset type and file."""
+
+    output_filename = ""
+
     if dataset_type == "open_ended":
+        output_filename = f"LM4HPC/Evaluation/{args.model_names}_semantic_similarity_{args.semantic_similarity_instruction_type}.csv"
+        print(f"Semantic Similarity Output CSV: {output_filename}")
         dataset = load_dataset("sharmaarushi17/HPCPerfOpt-Open-ended", data_files=data_file)
         print("Number of rows:", dataset['train'].num_rows)
     elif dataset_type == "mcqa":
+        output_filename = f"LM4HPC/Evaluation/{args.model_names}_exact_match_{args.exact_match_instruction_type}.csv"
+        print(f"Exact Match Output CSV: {output_filename}")
         dataset = load_dataset("sharmaarushi17/HPCPerfOpt-MCQA", data_files=data_file)
     else:
         raise ValueError(f"Invalid dataset_type: {dataset_type}")
+
     print(dataset)
-    return dataset
+    return dataset, output_filename
+
 
 def write_results_to_csv(results, headers, model_name, data_file, file_name, file_exists):
     """Write the evaluation results to a CSV file."""
+    
     with open(file_name, 'a', newline='') as csvfile:
         csvwriter = csv.writer(csvfile)
         if not file_exists:
@@ -230,13 +239,9 @@ if __name__ == "__main__":
     # Extract instructions based on user input
     semantic_similarity_instruction = SEMANTIC_SIMILARITY_INSTRUCTIONS[args.semantic_similarity_instruction_type]
     exact_match_instruction = EXACT_MATCH_INSTRUCTIONS[args.exact_match_instruction_type]
-
-    # Dynamically create output filenames based on provided arguments
-    semantic_similarity_output_csv = f"LM4HPC/Evaluation/{args.model_names}_semantic_similarity_{args.semantic_similarity_instruction_type}.csv"
-    exact_match_output_csv = f"LM4HPC/Evaluation/{args.model_names}_exact_match_{args.exact_match_instruction_type}.csv"
-
+    print(exact_match_instruction)
 
     # Run evaluations
-    evaluate_models(args.model_names, "semantic_similarity", semantic_similarity_output_csv, "open_ended", args, semantic_similarity_instruction)
-    evaluate_models(args.model_names, "exact_match", exact_match_output_csv, "mcqa", args, exact_match_instruction)
+   #evaluate_models(args.model_names, "semantic_similarity", semantic_similarity_output_csv, "open_ended", semantic_similarity_instruction, args)
+    evaluate_models(args.model_names, "exact_match", exact_match_output_csv, "mcqa", exact_match_instruction,args)
 
