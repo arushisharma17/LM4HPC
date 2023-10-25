@@ -22,12 +22,13 @@ def generate_dataset(dataset, model_name, output_csv):
 
     # Define various types of prompts
     prompts = [
-        "Given the above code snippet, can you generate OpenMP performance optimization multiple choice questions with a single correct answer?",
-        "Based on the provided code, can you ask a yes/no question?",
-        "Considering the code snippet above, can you create an open-ended question about its performance or structure?"
+            "Generate 10 OpenMP performance optimization multiple choice questions based on the given code snippet? The generated questions should be in json format with fields Question :<generated question>, Answer: <Solution to the generated question A, B, C or D>", "Generate OpenMP performance optimization questions based on the provided code. The questions should be based on advanced OpenMP conceptts with an answer 'Yes' or 'No'?", "Considering the code snippet above, can you create an open-ended question about optimizing the code for best performance using OpenMP?"
     ]
     
-    row_indices = [2, 11, 21,41,67,86,115,127]
+
+    #Selected Rodinia samples
+    #row_indices = [2, 11, 21,41,67,86,115,127]
+    row_indices = [2,11]
 
     # Open the CSV file for writing
     with open(output_csv, "w", newline="") as csvfile:
@@ -37,8 +38,6 @@ def generate_dataset(dataset, model_name, output_csv):
 
         for idx in row_indices:
             code_snippet = dataset['train']['Code (optional)'][idx]
-        #iterate over first 2 samples in dataset
-        #for code_snippet in dataset['train'][:2]:
             print(idx, code_snippet)
             input_sample = code_snippet  # name of column containing code snippet in selected dataset
             
@@ -47,8 +46,9 @@ def generate_dataset(dataset, model_name, output_csv):
 
             for prompt_template in prompts:
                 print(prompt_template)
-                full_prompt = input_sample + prompt_template
+                full_prompt = input_sample + " " + prompt_template
                 response = OMP_QA_sc(full_prompt)
+                print(response)
 
                 # Write the result immediately to the CSV
                 writer.writerow({
@@ -73,7 +73,8 @@ if __name__ == "__main__":
     rodinia_dataset = load_dataset("sharmaarushi17/HPCPerfOpt-MCQA", data_files="rodinia-chatgpt-mcq-orig.csv")
     print(rodinia_dataset)
 
-    generate_dataset(rodinia_dataset,"databricks/dolly-v2-3b","rodinia-generated-questions.csv")
+    #generate_dataset(rodinia_dataset,"databricks/dolly-v2-3b","rodinia-generated-questions.csv")
+    generate_dataset(rodinia_dataset,"gpt-4","rodinia-generated-questions1.csv")
 
     
     #Load ompify dataset
