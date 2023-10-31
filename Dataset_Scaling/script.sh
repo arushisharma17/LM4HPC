@@ -8,7 +8,7 @@
 nvidia-smi
 export HF_HOME=/pscratch/sd/s/sharma21/hf/
 cd $SCRATCH
-export OPENAI_API_KEY='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'
+export OPENAI_API_KEY='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'
 source ~/.bashrc
 source lm4hpcenv/bin/activate
 module load pytorch/2.0.1
