@@ -1,7 +1,8 @@
+'''To scale data using code snippets form original rodinia-benchmark based mcq dataset with standardized prompts found in prompts.py. '''
+
+#from prompts import PROMPTS
 import os
 from datasets import load_dataset
-from rouge import Rouge
-from sentence_transformers import SentenceTransformer, util
 import argparse
 import csv
 # Local imports
@@ -21,20 +22,39 @@ def generate_dataset(dataset, model_name, output_csv_base):
     # Initialize model pipeline
     OMP_QA_sc = hpcpipelines(task="openmp_question_answering", model=model_name, pdf_files="", langchain_embedding="")
 
-    # Define various types of prompts as dictionaries with an index and text
-    prompts = [
-            {"index": 0, "text": "Generate 2 OpenMP performance optimization multiple choice questions based on the given code snippet. The generated questions should be in json format with the following fields: Question :<generated question>, Options:<Four options A, B,C and D with one correct answer>, Answer: Correct answer to the generated question 'A', 'B', 'C' or 'D'>"},
-            {"index": 1, "text": "Generate 2 OpenMP performance optimization multiple choice questions based on the given code snippet. The generated questions should be in json format with the following fields: Question :<generated question>, Options:<Four options A, B,C and D with one correct answer>, Answer: Correct answer to the generated question 'A', 'B', 'C' or 'D'>"},           
-            {"index": 2, "text": "Generate 2 OpenMP performance optimization Yes/No questions based on the given code snippet. The questions should be in json format with the following fields: Question: <generated question> Answer: <Correct answer to the generated question 'Yes' or 'No'>"},
+# Define various types of prompts as dictionaries with an index and text
+prompts = [
+    {
+        "index": 0, 
+        "text": "Generate 10 OpenMP performance optimization multiple choice questions based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: Question :<generated question>, Options:<Four options A, B,C and D with one correct answer>, Answer: Correct answer to the generated question 'A', 'B', 'C' or 'D'>"
+    },
+    {
+        "index": 1, 
+        "text": "Generate 10  multiple choice questions about advanced OpenMP performance optimization concepts based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: Question :<generated question>, Options:<Four options A, B,C and D with one correct answer>, Answer: Correct answer to the generated question 'A', 'B', 'C' or 'D'>"
+    },           
+    {
+        "index": 2, 
+        "text": "Generate 10 OpenMP performance optimization Yes/No questions based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: <generated question> Answer: <Correct answer to the generated question 'Yes' or 'No'>"
+    },
+    {
+        "index": 3, 
+        "text": "Generate 10 Yes/No questions about advanced OpenMP performance optimization concepts based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: Question: <generated question> Answer: <Correct answer to the generated question 'Yes' or 'No'>"
+    },
+    {
+        "index": 4, 
+        "text": "Generate 10 open-ended OpenMP performance optimization questions based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: Question: <generated question> Answer: <Correct answer to the generated question>"
+    },
+    {
+        "index": 5, 
+        "text": "Generate 10 open-ended questions about advanced OpenMP performance optimization concepts based on the given code snippet. The generated questions should be in the form of a list of json objects containing the following fields: Question: <generated question> Answer: <Correct answer to the generated question>"
+    }
+]
 
-            {"index": 3, "text": "Generate 2 OpenMP performance optimization Yes/No questions based on the given code snippet. The questions should be in json format with the following fields: Question: <generated question> Answer: <Correct answer to the generated question 'Yes' or 'No'>"},
-
-            {"index":4, "text": "Generate 2 open-ended OpenMP performance optimization questions based on the given code snippet. The questions should be in json format with the following fields: Question: <generated question> Answer: <Correct answer to the generated question>"}
-    ]
 
     # Selected Rodinia samples
-    row_indices = [2, 11]
+    row_indices = [2, 11, 22, 42, 67, 86, 115, 127 ]
 
+    #prompts stored in PROMPTS in prompts.py
     for prompt in prompts:
 
         # Construct the CSV filename for this prompt
@@ -42,19 +62,21 @@ def generate_dataset(dataset, model_name, output_csv_base):
 
         # Open the CSV file for writing
         with open(output_csv, "w", newline="") as csvfile:
-            fieldnames = ["code_snippet", "prompt", "response"]
+            fieldnames = ["source","code_snippet", "prompt", "response"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
 
             for idx in row_indices:
                 code_snippet = dataset['train']['Code (optional)'][idx]
-                print(code_snippet)
+                source =  dataset['train']['Source'][idx]
+                print(source, code_snippet)
                 full_prompt = code_snippet + " " + prompt["text"]
                 print("full prompt", full_prompt)
                 response = OMP_QA_sc(full_prompt)
                 print(response)
 
                 writer.writerow({
+                    "source": source,
                     "code_snippet": code_snippet,
                     "prompt": full_prompt,
                     "response": response
@@ -65,7 +87,7 @@ def generate_dataset(dataset, model_name, output_csv_base):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate models for semantic similarity and exact match.")
+    parser = argparse.ArgumentParser(description="Scale Rodinia dataset using standardized prompts.")
     parser.add_argument("--mcqa_dataset_file", nargs='+', default=["mcq-single-orig.csv"], help="Paths to the MCQA dataset files.")
     parser.add_argument("--open_ended_dataset_file", nargs='+', default=["code.csv"], help="Paths to the open-ended dataset files.")
     parser.add_argument("--model_names", nargs='+', default=["gpt-4"], help="List of model names to evaluate.")
@@ -77,7 +99,7 @@ if __name__ == "__main__":
     print(rodinia_dataset)
 
     #generate_dataset(rodinia_dataset,"databricks/dolly-v2-3b","rodinia-generated-questions.csv")
-    generate_dataset(rodinia_dataset,"gpt-4","rodinia-generated-questions")
+    generate_dataset(rodinia_dataset,"gpt-4","rodinia-generated-final")
 
     
     #Load ompify dataset
