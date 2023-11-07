@@ -1,9 +1,59 @@
 from prompts import EVALUATION_PROMPTS
 from datasets import load_dataset
 from lm4hpc.hpcpipeline import hpcpipelines
+from sentence_transformers import SentenceTransformer, util
 import argparse
 import csv
 import os
+import json
+import re
+
+def load_dataset_from_hub(dataset_type, data_file, test_mode):
+    """
+    Load a dataset from the Hugging Face Hub based on the dataset type and file provided.
+
+    Parameters:
+    - dataset_type (str): The type of dataset to load. Accepted values are "mcq" for multiple-choice questions
+                          and "open_ended" for open-ended questions.
+    - data_file (str): The filename or path of the dataset file to load. This file should be located in the
+                       Hugging Face Hub repository specified by the dataset name.
+
+                       For "mcq" type, expected files could be 'mcq-single.csv', 'rodinia-basic.csv', or
+                       'rodinia-advanced.csv'.
+
+                       For "open_ended" type, expected files could be 'text.csv' or 'code.csv'.
+    - test_mode (bool): If True, only load the first two examples from the dataset for testing purposes.
+
+    Returns:
+    - dataset (DatasetDict): A `datasets.DatasetDict` object containing the loaded dataset.
+
+    Raises:
+    - ValueError: If the dataset_type is not one of the accepted values.
+
+    Example usage:
+    mcq_dataset = load_dataset_from_hub("mcq", "mcq-single.csv")
+    open_ended_dataset = load_dataset_from_hub("open_ended", "text.csv")
+    """
+
+    # Load MCQ-type dataset from the HPCPerfOpt-MCQA repository on the Hugging Face Hub.
+    if dataset_type == "mcq":
+        dataset = load_dataset("sharmaarushi17/HPCPerfOpt-MCQA", data_files=data_file)
+
+    # Load open-ended dataset from the HPCPerfOpt-Open-ended repository on the Hugging Face Hub.
+    elif dataset_type == "open_ended":
+        dataset = load_dataset("sharmaarushi17/HPCPerfOpt-Open-ended", data_files=data_file)
+
+    # Raise an error if an invalid dataset_type is provided.
+    else:
+        raise ValueError(f"Invalid dataset_type: {dataset_type}")
+
+   # If test_mode is True, only take the first two examples from each split.
+    if test_mode:
+        for split in dataset.keys():
+            dataset[split] = dataset[split].select(range(2))
+
+    return dataset
+
 
 def load_model_return_response(model_name, prompt):
     """
@@ -35,56 +85,10 @@ def load_model_return_response(model_name, prompt):
     return response
 
 
-def load_dataset_from_hub(dataset_type, data_file, test_mode):
-    """
-    Load a dataset from the Hugging Face Hub based on the dataset type and file provided.
-    
-    Parameters:
-    - dataset_type (str): The type of dataset to load. Accepted values are "mcq" for multiple-choice questions
-                          and "open_ended" for open-ended questions.
-    - data_file (str): The filename or path of the dataset file to load. This file should be located in the 
-                       Hugging Face Hub repository specified by the dataset name.
-                       
-                       For "mcq" type, expected files could be 'mcq-single.csv', 'rodinia-basic.csv', or 
-                       'rodinia-advanced.csv'.
-                       
-                       For "open_ended" type, expected files could be 'text.csv' or 'code.csv'.
-    - test_mode (bool): If True, only load the first two examples from the dataset for testing purposes.
-                        
-    Returns:
-    - dataset (DatasetDict): A `datasets.DatasetDict` object containing the loaded dataset.
-    
-    Raises:
-    - ValueError: If the dataset_type is not one of the accepted values.
-    
-    Example usage:
-    mcq_dataset = load_dataset_from_hub("mcq", "mcq-single.csv")
-    open_ended_dataset = load_dataset_from_hub("open_ended", "text.csv")
-    """
-
-    # Load MCQ-type dataset from the HPCPerfOpt-MCQA repository on the Hugging Face Hub.
-    if dataset_type == "mcq":
-        dataset = load_dataset("sharmaarushi17/HPCPerfOpt-MCQA", data_files=data_file)
-
-    # Load open-ended dataset from the HPCPerfOpt-Open-ended repository on the Hugging Face Hub.
-    elif dataset_type == "open_ended":
-        dataset = load_dataset("sharmaarushi17/HPCPerfOpt-Open-ended", data_files=data_file)
-
-    # Raise an error if an invalid dataset_type is provided.
-    else:
-        raise ValueError(f"Invalid dataset_type: {dataset_type}")
-    
-   # If test_mode is True, only take the first two examples from each split.
-    if test_mode:
-        for split in dataset.keys():
-            dataset[split] = dataset[split].select(range(2))
-
-    return dataset
-
 
 def create_LLM_prompt_from_example(example,dataset_type, prompt_type):
     '''
-    Generate a language model prompt for a given example, which can be multiple-choice or open-ended.
+    Generate a language model prompt for a given example, based on instructions stored in EVALUATION_PROMPTS dictionary stored in prompts.py
 
     Parameters:
     - example (dict): A dictionary containing the example data.
@@ -94,9 +98,6 @@ def create_LLM_prompt_from_example(example,dataset_type, prompt_type):
     - str: A formatted string that serves as a prompt for a language model, containing the instruction (if provided),
            and the necessary information extracted from the example.
 
-    Raises:
-    - KeyError: If expected keys are missing in the `example` dictionary for the respective prompt type.
-    - ValueError: If the `prompt_type` is not one of the expected values.
     '''
     # If prompt_type is 'none', set instruction to an empty string
     instruction = ''
@@ -128,28 +129,71 @@ def create_LLM_prompt_from_example(example,dataset_type, prompt_type):
 
 
 
-#Note: prompts DO NOT depend on evaluation type here. We evaluate the different types of prompts
+def process_cot_response(response_str):
+    json_pattern = r"{\'Answer\': \'[A-D]\'}"
+
+    # Find all matches; note that this will only work with this very specific pattern
+    matches = re.findall(json_pattern, response_str)
+
+    # If there is at least one match, parse the first one (assuming there's only one JSON object)
+    if matches:
+        # Convert single quotes to double quotes to make it valid JSON
+        json_str = matches[0].replace("\'", "\"")
+        response_dict = json.loads(json_str)
+        print(f"The extracted answer is: {response_dict['Answer']}")
+        return response_dict['Answer']
+    else:
+        print("No valid JSON object found.")
+
+def bleu_score_evaluation(open_ended_Dataset, model_name, args):
+    bleu = evaluate.load("bleu")
+    #loop through dataset and     
+    #uses list of predictions and list of references
+    results = bleu.compute(predictions=predictions, references=references)
+    print(results)
+    #{'bleu': 1.0, 'precisions': [1.0, 1.0, 1.0, 1.0], 'brevity_penalty': 1.0, 'length_ratio': 1.0, 'translation_length': 7, 'reference_length':
 
 
 def exact_match_evaluation(mcqa_dataset, model_name, args):
-    '''Evaluate model based on exact match for MCQs'''
+    """
+    Evaluate a language model based on exact match between the model's response and the correct answer for multiple-choice questions.
+
+    Parameters:
+    - mcqa_dataset (dict): A dataset containing multiple-choice questions and answers.
+    - model_name (str): The name of the model to be evaluated.
+    - args (Namespace): An argparse Namespace containing 'dataset_type' and 'prompt_type'.
+
+    Returns:
+    - accuracy (float): The proportion of correctly answered questions.
+    - results (list): A list of dictionaries containing prompts, responses, correct answers, and correctness flags.
+    """
+
     correct = 0
     total = 0
     results = []
-
     for idx, example in enumerate(mcqa_dataset['train']):
         print(f"Example #{idx + 1}: {example}\n{'-' * 80}")
+        correct_answer = example['Answer']
         prompt = create_LLM_prompt_from_example(example, args.dataset_type, args.prompt_type)
-
         if prompt is not None:
             print(f"Prompt #{idx + 1}:\n{prompt}\n{'-' * 80}")
             response = load_model_return_response(model_name, prompt)
-
             if response:  # Check if response is not empty
-                print(response)
-                correct_answer = example.get('Answer')  # Safely get 'Answer' key
+                print("response",response)
+                response_type = type(response)
+                print(f"The type of 'response' is: {response_type}")
                 if correct_answer is not None:
-                    is_correct = (correct_answer.strip() == response[0].strip())  # Strip spaces before comparison
+                    if args.prompt_type=="standard":
+                        is_correct = (correct_answer.strip() == response[0].strip())  # Strip spaces before comparison
+                    elif args.prompt_type=="cot":
+                        #get answer from json object and compare
+                        ans = process_cot_response(response)
+                        if ans is None:
+                            is_correct=False
+                        else:
+                            is_correct = (correct_answer.strip() == ans.strip())  # Strip spaces before comparison
+                    else:
+                        print("error: exact match prompt_type invalid")
                     if is_correct:
                         correct += 1
                     # Now we collect the results after each example is processed
@@ -166,36 +210,132 @@ def exact_match_evaluation(mcqa_dataset, model_name, args):
                 print("Response is empty or None.")
         else:
             print("Prompt could not be generated due to missing data.")
-
         total += 1  # Increment total inside the loop
-
     accuracy = correct / total if total > 0 else 0  # Prevent division by zero
     return accuracy, results
 
-#create separate csv file for each combo and store in one model folder. Later mix and match in bash script. 
-def create_output_filename(dataset_type, data_file, prompt_type, eval_metric):
-    '''
-    Create an output filename based on dataset type, data file, prompt type, and evaluation metric.
+
+def semantic_similarity_evaluation(open_ended_dataset, model_name, args):
+    """
+    Evaluate a language model based on semantic similarity between the model's response and the correct answer for open-ended questions.
+
+    This function computes the semantic similarity using cosine similarity between the embeddings of the model's response and the correct answer. A threshold is set to determine whether the response is considered 'correct'.
 
     Parameters:
-    - dataset_type (str): The type of the dataset (e.g., 'training', 'validation', 'test').
-    - data_file (str): The path to the original data file.
-    - prompt_type (str): The type of the prompt (e.g., 'multiple_choice', 'true_false').
-    - eval_metric (str): The evaluation metric used (e.g., 'accuracy', 'f1_score').
+    - open_ended_dataset (dict): A dataset containing open-ended questions and answers.
+    - model_name (str): The name of the model to be evaluated.
+    - args (Namespace): An argparse Namespace containing 'dataset_type' and 'prompt_type'.
 
     Returns:
-    - str: A formatted output filename.
-    '''
+    - accuracy (float): The proportion of questions where the cosine similarity between the response and the correct answer is above the threshold.
+    - results (list): A list of dictionaries containing prompts, responses, correct answers, cosine similarity values, and correctness flags.
 
-    # Extract the base name of the data file without extension
-    base_name = os.path.splitext(os.path.basename(data_file))[0]
+    """
+    # Initialize sentence transformer model
+    embedder = SentenceTransformer('paraphrase-MiniLM-L6-v2')
 
-    # Create the output filename
-    output_filename = f"{dataset_type}_{base_name}_{prompt_type}_{eval_metric}.csv"
+    correct_count = 0
 
-    return output_filename
+    results = []
+    for idx, example in enumerate(open_ended_dataset['train']):
+        print(f"Example #{idx + 1}: {example}\n{'-' * 80}")
+        correct_answer = example['Answer']
+        prompt = create_LLM_prompt_from_example(example, args.dataset_type, args.prompt_type)
+        if prompt is not None:
+            print(f"Prompt #{idx + 1}:\n{prompt}\n{'-' * 80}")
+            response = load_model_return_response(model_name, prompt)
+            if response:  # Check if response is not empty
+                print("response",response)
+                response_type = type(response)
+                print(f"The type of 'response' is: {response_type}")
 
-    '''output filename based on dataset type, prompt type and evaluation metric'''
+                # Generate embeddings for the response and correct answer
+                response_embedding = embedder.encode(response, convert_to_tensor=True)
+                correct_answer_embedding = embedder.encode(correct_answer, convert_to_tensor=True)
+
+                # Compute cosine similarity
+                cosine_similarity = util.pytorch_cos_sim(response_embedding, correct_answer_embedding).item()
+
+                is_correct = cosine_similarity >= 0.3  # Adjust the threshold as needed
+
+                if is_correct:
+                    correct_count += 1
+
+            results.append({
+                "prompt": prompt,
+                "response": response,
+                "correct_answer": correct_answer,
+                "similarity": cosine_similarity,
+                "is_correct": is_correct
+            })
+
+            #Add model_name to store in csv
+
+    num_rows = len(open_ended_dataset['train'])
+    accuracy = correct_count / num_rows if num_rows > 0 else 0
+    return accuracy, results
+
+
+def store_eval_results_in_csv(dataset_type, data_file, prompt_type, eval_type, model_name, results, overwrite=False):
+    """
+    Store evaluation results in a CSV file.
+
+    This function creates a CSV file and directory structure based on the given parameters. It handles different types
+    of evaluation results and ensures that the resulting CSV file's headers match the results data structure. If the
+    CSV file already exists, it will not be overwritten unless `overwrite` is set to True.
+
+    Parameters:
+    - dataset_type (str): The type of dataset being evaluated (e.g., "Train", "Test").
+    - data_file (str): The name of the data file (e.g., "DataFile1").
+    - prompt_type (str): The type of prompt used in the evaluation (e.g., "MultipleChoice").
+    - eval_type (str): The type of evaluation ("exact_match" or "semantic_similarity").
+    - model_name (str): The name of the model being evaluated (e.g., "ModelX").
+    - results (list of dicts): A list of dictionaries containing the results data.
+    - overwrite (bool, optional): Whether to overwrite the existing CSV file if it exists. Defaults to False.
+
+    Returns:
+    None: This function does not return any value. It writes directly to a file.
+
+    Raises:
+    Exception: If an error occurs during the creation of the directories or the writing of the CSV file.
+    """
+
+    try:
+        # Define the directory structure for Results->{dataset_type}->{data_file}->{model_name}
+        directory_path = os.path.join("Results", dataset_type, data_file, model_name)
+        os.makedirs(directory_path, exist_ok=True)  # Create the directory if it doesn't exist
+
+        # Define the CSV file path
+        output_csv = os.path.join(directory_path, f"{dataset_type}_{model_name}_{prompt_type}_{eval_type}.csv")
+
+        # Check if file exists and if overwrite is False
+        if os.path.exists(output_csv) and not overwrite:
+            print(f"The file {output_csv} already exists. Set overwrite=True to overwrite it.")
+            return
+
+        # Determine the headers based on the eval_type
+        headers = ['Prompt', 'Response', 'Correct Answer']
+        if eval_type == "exact_match":
+            headers += ['Is Correct']
+        elif eval_type == "semantic_similarity":
+            headers += ['Similarity', 'Is Correct']
+
+        # Write the results to the CSV file
+        with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(headers)  # Write the headers
+            
+            # Write the data
+            for result in results:
+                if eval_type == "exact_match":
+                    writer.writerow([result['prompt'], result['response'], result['correct_answer'], result['is_correct']])
+                elif eval_type == "semantic_similarity":
+                    writer.writerow([result['prompt'], result['response'], result['correct_answer'], result['similarity'], result['is_correct']])
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        
+
 
 def main(args):
     # Your code to load the dataset and evaluate the model would go here
@@ -203,44 +343,34 @@ def main(args):
     print(f"Using prompt type: {args.prompt_type}")
     print(f"Evaluating model(s): {', '.join(args.model_names)}")
     
-     #Build the name of the output_csv based on the provided arguments- it should append results of all models.It should not override previous results of a specific model but it should append if tehy don't exist. 
-    output_csv = f"{args.dataset_type}_{args.prompt_type}_{args.eval_type}_evaluation_results.csv"
-
-    #Should iterate over prompt types and deal with models separately as they are likely to be more problematic.
-    #need separate evaluation for each prompt type and each dataset type and for each model.
-    #add models to a dictionary/config file as well. 
-
     dataset = load_dataset_from_hub(args.dataset_type, args.data_file, args.test_mode)
     print(f"Loaded dataset with {len(dataset['train'])} examples for evaluation.",dataset) 
     
     #need a loop for model_names
     for model_name in args. model_names:
-        accuracy, results = exact_match_evaluation(dataset, model_name, args)
-        store_exact_match_results_in_csv(results, output_csv)
-        print(f"Model: {model_name} - Accuracy: {accuracy}")
-        #exact_match_evaluation(dataset,model_name, args):
-
-    '''
-    for idx, example in enumerate(mcqa_dataset['train']):
-        print(f"Example #{idx + 1}: {example}\n{'-' * 80}")
-        #Create prompt based on example and prompt type
-        prompt = create_LLM_prompt_from_example(example, args.prompt_type)
-        # Check if the prompt is None, which could be due to an error.
-        if prompt is not None:
-            print(f"Prompt #{idx + 1}:\n{prompt}\n{'-' * 80}")
+        if args.eval_type=="exact_match":
+            accuracy, results = exact_match_evaluation(dataset, model_name, args)
+            store_eval_results_in_csv(args.dataset_type, args.data_file, args.prompt_type, args.eval_type, model_name, results)
+            print(f"Model: {model_name} - Accuracy: {accuracy}")
+            #exact_match_evaluation(dataset,model_name, args):
+        elif args.eval_type=="semantic_similarity":
+            accuracy, results = semantic_similarity_evaluation(dataset, model_name, args)
+            store_eval_results_in_csv(args.dataset_type, args.data_file, args.prompt_type, args.eval_type, model_name, results)
+            print(f"Model: {model_name} - Accuracy: {accuracy}")
+        elif args.eval_type=="bleu_score":
+            accuracy, results = bleu_score_evaluation(dataset, model_name, args)
+            store_eval_results_in_csv(args.dataset_type, args.data_file, args.prompt_type, args.eval_type, model_name, results)
+            print(f"Model: {model_name} - Accuracy: {accuracy}")
+        elif args.eval_type=="codebertscore":
+            accuracy, results = bleu_score_evaluation(dataset, model_name, args)
+            store_eval_results_in_csv(args.dataset_type, args.data_file, args.prompt_type, args.eval_type, model_name, results)
+            print(f"Model: {model_name} - Accuracy: {accuracy}")
+        elif args.eval_type=="llm-as-judge":
+            accuracy, results = bleu_score_evaluation(dataset, model_name, args)
+            store_eval_results_in_csv(args.dataset_type, args.data_file, args.prompt_type, args.eval_type, model_name, results)
+            print(f"Model: {model_name} - Accuracy: {accuracy}")
         else:
-            print(f"Prompt #{idx + 1} could not be generated due to missing data.\n{'-' * 80}")
-        #Get response from selected model
-        response = load_model_return_response(model_name, prompt)
-        print(response)
-
-  #create prompt based on selection from EVALUATION_PROMPTS and relevant fileds from the dataset
-  #loop on the dataset here and have the function do it for one example at a time
-
-        exact_match_evaluation(example['Answer'],response)
-    '''
-
-
+            print("error")
 
 if __name__ == "__main__":
     # Create the parser
@@ -274,15 +404,12 @@ if __name__ == "__main__":
                         default='none',  # Set the default value to 'none'
                         choices=['standard', 'cot', 'text', 'code', 'none'],
                         help='The type of prompt to be used for the LLM. "none" will use no additional prompt information.')
+    
     parser.add_argument('--eval_type',
                         type=str,
                         default='none',  # Set the default value to 'none'
                         choices=['exact_match','semantic_similarity','bleu_score','codebertscore','LLM_as_a_judge'],
                         help='The type of evaluation to be performed. "none" will use no additional prompt information.')
-
-   #Build the name of the output_csv based on the provided arguments- it should append results of all models.It should not override previous results of a specific model but it should append if tehy don't exist. For each model type, for each prompt type,for each data_file-> append to same csv file. Maybe move this to bash script later. 
- #output_csv = f"{args.dataset_type}_{args.prompt_type}_{args.eval_type}_evaluation_results.csv"
-
 
     args = parser.parse_args()
     main(args)

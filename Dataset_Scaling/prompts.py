@@ -17,11 +17,12 @@ EVALUATION_PROMPTS = {
     # MCQA prompts
     "MCQA": {
         "index": 0,
-        "standard": ("The following is a multiple choice question about openmp performance optimization. "
-                     "Output a single option 'A', 'B', 'C' or 'D' from the four options as the final answerin json format. Example output: {'Answer': 'C'}. "),
+        "standard": ("Answer the following multiple choice question about openmp performance optimization. "
+                     "The output should be the correct answer restricted to a single option letter 'A', 'B', 'C' or 'D' from the four options."),
+
         "cot": ("The following is a multiple choice question about openmp performance optimization. "
                 "Solve it in a step-by-step fashion, starting by summarizing the available information. "
-                "Output a single option from the four options as the final answer. The output should be restricted to  json format with the following two fields: "
+                "Output a single option from the four options as the final answer. The output format should be restricted to a json object with the following two fields: "
                 "{'Explanation': <containing step-by-step reasoning>, 'Answer':<containing correct option letter>}.")
     },
 
